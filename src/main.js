@@ -290,9 +290,8 @@ engineSound.setRefDistance(4);       // расстояние, где звук «
 engineSound.setRolloffFactor(1.6);   // как быстро глохнет с расстоянием
 engineSound.setLoop(true);
 engineSound.setVolume(0.6);
-audioLoader.load('/sounds/engine.mp3', (buffer) => {
-  engineSound.setBuffer(buffer);
-});
+audioLoader.load(import.meta.env.BASE_URL + 'sounds/engine.mp3',
+  (buffer) => engineSound.setBuffer(buffer));
 car.add(engineSound);
 
 // --- Звук удара. Пул из 6 объектов, чтобы можно было играть несколько подряд. ---
@@ -302,8 +301,8 @@ for (let i = 0; i < HIT_POOL_SIZE; i++) {
   const hit = new THREE.PositionalAudio(listener);
   hit.setRefDistance(6);
   hit.setRolloffFactor(1.2);
-  hit.setVolume(0.9);
-  audioLoader.load('/sounds/hit.mp3', (buffer) => hit.setBuffer(buffer));
+  hit.setVolume(0.9);import.meta.env.BASE_URL + 'sounds/hit.mp3',
+  (buffer) => hit.setBuffer(buffer));
   scene.add(hit);
   hitPool.push(hit);
 }
@@ -319,7 +318,7 @@ function playHitAt(x, y, z) {
 
 // --- Фоновая музыка через Howler (не 3D, играет «в голове») ---
 const bgMusic = new Howl({
-  src: ['/sounds/background.mp3'],
+  src: [import.meta.env.BASE_URL + 'sounds/background.mp3'],src: ['/sounds/background.mp3'],
   loop: true,
   volume: 0.05,
   html5: true, // чтобы не грузить весь файл в память сразу
