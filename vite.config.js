@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/Car-Game/', // ← имя вашего репозитория
+  base: '/Car_Game/',
 });
