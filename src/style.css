@@ -66,8 +66,13 @@ canvas {
   width: 100vw;
   height: 100vh;
   z-index: 50;
-  display: none; /* показывается через JS, если это тач-устройство */
+  display: none;
   touch-action: none;
+}
+
+/* Стили самого джойстика от nipplejs */
+#joystick-zone .nipple {
+  opacity: 0.5 !important;
 }
 
 @media (pointer: coarse) {

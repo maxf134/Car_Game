@@ -528,7 +528,6 @@ function makeBush(x, z) {
   scene.add(g);
   registerZone(x, z, 0.7);
 
-  // Кусты качаются сильнее деревьев + свой рандом
   swayers.push({
     mesh: g,
     amountZ: 0.06 + Math.random() * 0.06,
@@ -583,7 +582,6 @@ function makeLamp(x, z) {
   });
 }
 
-// Дерево — крупное, качается сильно и по-разному
 function makeTree(x, z) {
   const y = getHeight(x, z);
   if (y < WATER_LEVEL + 0.5) return;
@@ -617,8 +615,6 @@ function makeTree(x, z) {
   staticObjects.push({ x, z, radius: 1.4 });
   registerZone(x, z, 1.4);
 
-  // Качание деревьев: крупные, разные, по двум осям
-  // Чем больше дерево — тем меньше амплитуда (крупные деревья устойчивее)
   const sizeFactor = 0.6 + Math.random() * 0.4;
   swayers.push({
     mesh: g,
@@ -734,14 +730,14 @@ function makeGrassPatch(x, z, radius) {
 }
 
 // ===================
-// 10. Пыль — реалистичная, через ShaderMaterial
+// 10. Пыль
 // ===================
 const DUST_COUNT = 120;
 
 const dustPositions = new Float32Array(DUST_COUNT * 3);
 const dustVelocities = new Float32Array(DUST_COUNT * 3);
-const dustLife = new Float32Array(DUST_COUNT);      // текущее (0..1)
-const dustMaxLife = new Float32Array(DUST_COUNT);   // базовое время жизни
+const dustLife = new Float32Array(DUST_COUNT);
+const dustMaxLife = new Float32Array(DUST_COUNT);
 const dustSizes = new Float32Array(DUST_COUNT);
 const dustAlphas = new Float32Array(DUST_COUNT);
 const dustColors = new Float32Array(DUST_COUNT * 3);
@@ -782,7 +778,6 @@ const dustMat = new THREE.ShaderMaterial({
     varying float vAlpha;
     varying vec3 vColor;
     void main() {
-      // Мягкий круглый градиент с затуханием к краям
       vec2 c = gl_PointCoord - vec2(0.5);
       float d = length(c);
       if (d > 0.5) discard;
@@ -801,29 +796,22 @@ function emitDust(x, y, z, drift) {
   const i = dustIndex;
   dustIndex = (dustIndex + 1) % DUST_COUNT;
 
-  // Базовая точка — с небольшим разбросом
   dustPositions[i * 3]     = x + (Math.random() - 0.5) * 1.5;
   dustPositions[i * 3 + 1] = y + 0.15 + Math.random() * 0.2;
   dustPositions[i * 3 + 2] = z + (Math.random() - 0.5) * 1.5;
 
-  // Скорость в мире — слегка вверх и в стороны, плюс лёгкий снос по ветру
   const upSpeed = 0.8 + Math.random() * 1.2;
   dustVelocities[i * 3]     = (Math.random() - 0.5) * 1.5 + (drift?.x || 0);
   dustVelocities[i * 3 + 1] = upSpeed;
   dustVelocities[i * 3 + 2] = (Math.random() - 0.5) * 1.5 + (drift?.z || 0);
 
-  // Время жизни — рандом для каждой частицы (0.5–1.0 с)
   dustMaxLife[i] = 0.5 + Math.random() * 0.5;
   dustLife[i] = 1.0;
 
-  // Размер растёт со временем: базовый 0.6–1.2, максимальный 3–5
   dustMaxSizes[i] = 3.0 + Math.random() * 2.5;
   dustSizes[i] = 0.6 + Math.random() * 0.5;
-
-  // Альфа — стартовая
   dustAlphas[i] = 0.75;
 
-  // Цвет — бежево-серый с лёгким разнообразием
   const shade = 0.75 + Math.random() * 0.15;
   dustColors[i * 3]     = 0.78 * shade;
   dustColors[i * 3 + 1] = 0.70 * shade;
@@ -834,7 +822,6 @@ function updateDust(dt) {
   for (let i = 0; i < DUST_COUNT; i++) {
     if (dustLife[i] <= 0) continue;
 
-    // Уменьшаем жизнь относительно её максимума
     dustLife[i] -= dt / dustMaxLife[i];
 
     if (dustLife[i] <= 0) {
@@ -846,29 +833,22 @@ function updateDust(dt) {
       continue;
     }
 
-    // t = 1 - life: 0 = только родилась, 1 = умирает
     const t = 1 - dustLife[i];
 
-    // Движение
     dustPositions[i * 3]     += dustVelocities[i * 3]     * dt;
     dustPositions[i * 3 + 1] += dustVelocities[i * 3 + 1] * dt;
     dustPositions[i * 3 + 2] += dustVelocities[i * 3 + 2] * dt;
 
-    // Гравитация — ослабевает к концу жизни (пылинки «висят»)
     const gravity = 2.5 * (1 - t * 0.7);
     dustVelocities[i * 3 + 1] -= gravity * dt;
 
-    // Сопротивление воздуха — затухает
     const drag = Math.pow(0.05, dt);
     dustVelocities[i * 3]     *= drag;
     dustVelocities[i * 3 + 1] *= drag;
     dustVelocities[i * 3 + 2] *= drag;
 
-    // Размер растёт (дымка расширяется)
     dustSizes[i] = (0.6 + Math.random() * 0.5) + (dustMaxSizes[i] - 0.6) * t;
 
-    // Прозрачность: разгорается быстро, потом плавно исчезает
-    // (пик около 0.15 жизни, к концу → 0)
     if (t < 0.15) {
       dustAlphas[i] = 0.75 * (t / 0.15);
     } else {
@@ -945,19 +925,32 @@ function buildCar() {
 }
 
 // ===================
-// 12. Звук
+// 12. Звук — с надёжным запуском
 // ===================
 const listener = new THREE.AudioListener();
 camera.add(listener);
 const audioLoader = new THREE.AudioLoader();
 const SOUND_BASE = import.meta.env.BASE_URL + 'sounds/';
 
+console.log('🔊 Путь к звукам:', SOUND_BASE);
+
 const engineSound = new THREE.PositionalAudio(listener);
 engineSound.setRefDistance(4);
 engineSound.setRolloffFactor(1.2);
 engineSound.setLoop(true);
 engineSound.setVolume(0.6);
-audioLoader.load(SOUND_BASE + 'engine.mp3', (b) => engineSound.setBuffer(b));
+let engineBufferReady = false;
+audioLoader.load(
+  SOUND_BASE + 'engine.mp3',
+  (b) => {
+    engineSound.setBuffer(b);
+    engineBufferReady = true;
+    console.log('✅ Звук двигателя загружен');
+    if (audioStarted) engineSound.play();
+  },
+  undefined,
+  (err) => console.error('❌ Ошибка загрузки engine.mp3:', err)
+);
 car.add(engineSound);
 
 const HIT_POOL_SIZE = 10;
@@ -967,7 +960,12 @@ for (let i = 0; i < HIT_POOL_SIZE; i++) {
   hit.setRefDistance(6);
   hit.setRolloffFactor(1.0);
   hit.setVolume(0.9);
-  audioLoader.load(SOUND_BASE + 'hit.mp3', (b) => hit.setBuffer(b));
+  audioLoader.load(
+    SOUND_BASE + 'hit.mp3',
+    (b) => hit.setBuffer(b),
+    undefined,
+    (err) => console.error('❌ Ошибка загрузки hit.mp3:', err)
+  );
   scene.add(hit);
   hitPool.push(hit);
 }
@@ -987,15 +985,28 @@ const bgMusic = new Howl({
   volume: 0.1,
   preload: true,
   format: ['mp3'],
+  onloaderror: (id, err) => console.error('❌ Ошибка загрузки музыки:', err),
+  onload: () => console.log('✅ Фоновая музыка загружена'),
 });
 
 let audioStarted = false;
 function startAudioOnce() {
   if (audioStarted) return;
   audioStarted = true;
-  if (engineSound.buffer) engineSound.play();
+  console.log('🔊 Запуск звука...');
+  if (listener.context.state === 'suspended') {
+    listener.context.resume();
+  }
+  if (engineBufferReady) {
+    engineSound.play();
+  }
   bgMusic.play();
 }
+
+// Глобальные обработчики — запуск звука при первом касании/клике где угодно
+window.addEventListener('touchstart', startAudioOnce, { once: true, passive: true });
+window.addEventListener('click', startAudioOnce, { once: true });
+window.addEventListener('keydown', startAudioOnce, { once: true });
 
 // ===================
 // 13. Ввод
@@ -1014,7 +1025,7 @@ window.addEventListener('keyup', (e) => {
   if (k) { keys[k] = false; e.preventDefault(); }
 });
 
-// --- Джойстик: включаем через JS-детекцию тача ---
+// --- Джойстик ---
 let joystickForward = 0;
 let joystickTurn = 0;
 const joystickZone = document.getElementById('joystick-zone');
@@ -1024,45 +1035,46 @@ const isTouchDevice =
   (navigator.maxTouchPoints > 0) ||
   (navigator.msMaxTouchPoints > 0);
 
-if (joystickZone) {
-  if (isTouchDevice) {
-    // Показываем зону явно через JS — не полагаемся на CSS media query
-    joystickZone.style.display = 'block';
-    joystickZone.style.pointerEvents = 'auto';
-    joystickZone.style.touchAction = 'none';
+if (joystickZone && isTouchDevice) {
+  joystickZone.style.display = 'block';
+  joystickZone.style.touchAction = 'none';
 
-    const jm = nipplejs.create({
-      zone: joystickZone,
-      mode: 'dynamic',
-      color: 'white',
-      size: 120,
-      threshold: 0.05,
-      fadeTime: 150,
-      restJoystick: true,
-      restOpacity: 0.6,
-    });
+  const jm = nipplejs.create({
+    zone: joystickZone,
+    mode: 'dynamic',
+    color: 'rgba(0, 0, 0, 0.5)',
+    size: 80,
+    threshold: 0.08,
+    fadeTime: 100,
+    restOpacity: 0.4,
+  });
 
-    jm.on('start', () => {
-      hideHint();
-      startAudioOnce();
-    });
+  jm.on('start', () => {
+    hideHint();
+    startAudioOnce();
+  });
 
-    jm.on('move', (evt, data) => {
-      if (!data || !data.vector) return;
-      joystickForward = data.vector.y;
-      joystickTurn = data.vector.x;
-    });
+  jm.on('move', (evt, data) => {
+    if (!data || !data.angle) return;
+    // angle.radian: 0 = вправо, π/2 = вверх, π = влево, -π/2 = вниз
+    const rad = data.angle.radian;
+    // Нормализуем силу: distance от 0 до ~size/2
+    const maxDist = 40;
+    const force = Math.min((data.distance || 0) / maxDist, 1);
 
-    jm.on('end', () => {
-      joystickForward = 0;
-      joystickTurn = 0;
-    });
+    // Вперёд = sin(angle), вправо = cos(angle)
+    joystickForward = Math.sin(rad) * force;
+    joystickTurn = Math.cos(rad) * force;
+  });
 
-    console.log('🕹️ Джойстик активирован (тач-устройство)');
-  } else {
-    joystickZone.style.display = 'none';
-    console.log('💻 Десктоп: джойстик отключён (управление WASD)');
-  }
+  jm.on('end', () => {
+    joystickForward = 0;
+    joystickTurn = 0;
+  });
+
+  console.log('🕹️ Джойстик активирован');
+} else if (joystickZone) {
+  joystickZone.style.display = 'none';
 }
 
 const hint = document.getElementById('hint');
@@ -1231,8 +1243,8 @@ function animate() {
   const timeSec = now * 0.001;
 
   const kbThrottle = (keys.w ? 1 : 0) - (keys.s ? 1 : 0);
-  const jsThrottle = joystickForward > 0.1 ? joystickForward
-                    : joystickForward < -0.1 ? joystickForward : 0;
+  const jsThrottle = joystickForward > 0.15 ? joystickForward
+                    : joystickForward < -0.15 ? joystickForward : 0;
 
   if (kbThrottle !== 0) {
     if (kbThrottle > 0) speed += ACCELERATION * dt;
@@ -1250,7 +1262,7 @@ function animate() {
   let turnInput = 0;
   if (keys.a) turnInput += 1;
   if (keys.d) turnInput -= 1;
-  if (Math.abs(joystickTurn) > 0.1) turnInput -= joystickTurn;
+  if (Math.abs(joystickTurn) > 0.15) turnInput -= joystickTurn;
   car.rotation.y += TURN_SPEED * dt * turnFactor * turnInput;
 
   smoothTurn += (turnInput - smoothTurn) * Math.min(1, dt * 4);
@@ -1272,24 +1284,20 @@ function animate() {
 
   wheels.forEach((w) => { w.rotation.y -= speed * dt * 3; });
 
-  // --- Дым от колёс ---
+  // Дым
   const accel = (speed - prevSpeed) / Math.max(dt, 1e-4);
   prevSpeed = speed;
 
-  // Эмит при быстрой езде
   if (Math.abs(speed) > 6) {
     const emitRate = Math.min(Math.abs(speed) / MAX_SPEED, 1.0);
     if (Math.random() < emitRate * 1.2) {
-      // Позади машины (со смещением в стороны — под колёсами)
       const rearX = car.position.x - forwardVec.x * 2.0;
       const rearZ = car.position.z - forwardVec.z * 2.0;
-      // Лёгкий снос пыли назад по ходу движения
       driftVec.set(-forwardVec.x * speed * 0.15, 0, -forwardVec.z * speed * 0.15);
       emitDust(rearX, car.position.y, rearZ, driftVec);
     }
   }
 
-  // Эмит при резком торможении
   if (accel < -20 && Math.abs(speed) > 3) {
     if (Math.random() < 0.4) {
       const rearX = car.position.x - forwardVec.x * 1.8;
@@ -1301,7 +1309,6 @@ function animate() {
 
   updateDust(dt);
 
-  // Мерцание фонарей
   for (const f of lampFlickers) {
     const flick = 0.85 + Math.sin(timeSec * 7 + f.phase) * 0.1
                 + Math.sin(timeSec * 13 + f.phase * 1.7) * 0.05;
@@ -1309,26 +1316,22 @@ function animate() {
     f.headMaterial.emissiveIntensity = f.baseEmissive * flick;
   }
 
-  // Качание деревьев и кустов — по двум осям, у каждого свои параметры
   for (const s of swayers) {
     s.mesh.rotation.z = Math.sin(timeSec * s.speedZ + s.phaseZ) * s.amountZ;
     s.mesh.rotation.x = Math.sin(timeSec * s.speedX + s.phaseX) * s.amountX;
   }
 
-  // Камера
   const cameraOffset = new THREE.Vector3(16, 16, 16);
   const desiredPos = cameraOffset.clone().add(car.position);
   camera.position.lerp(desiredPos, 1 - Math.pow(0.0001, dt));
   camera.lookAt(car.position.x, car.position.y + 1.2, car.position.z);
 
-  // Звук
   if (engineSound.isPlaying) {
     const sr = Math.abs(speed) / MAX_SPEED;
     engineSound.setPlaybackRate(0.8 + sr * 0.7);
     engineSound.setVolume(0.4 + sr * 0.5);
   }
 
-  // Волны воды
   waterUniforms.uTime.value = timeSec;
 
   composer.render();
