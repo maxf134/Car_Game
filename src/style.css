@@ -10,9 +10,10 @@ body {
   height: 100%;
   overflow: hidden;
   background: #87ceeb;
-  touch-action: none; /* отключаем скролл/зум на мобильных */
+  touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #app {
@@ -56,27 +57,4 @@ canvas {
 
 #hint b {
   color: #ffee00;
-}
-
-/* Зона джойстика — только для тач-устройств */
-#joystick-zone {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 50;
-  display: none;
-  touch-action: none;
-}
-
-/* Стили самого джойстика от nipplejs */
-#joystick-zone .nipple {
-  opacity: 0.5 !important;
-}
-
-@media (pointer: coarse) {
-  #joystick-zone {
-    display: block;
-  }
 }

@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { Howl } from 'howler';
-import nipplejs from 'nipplejs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -925,7 +924,7 @@ function buildCar() {
 }
 
 // ===================
-// 12. Звук — с надёжным запуском
+// 12. Звук
 // ===================
 const listener = new THREE.AudioListener();
 camera.add(listener);
@@ -997,19 +996,16 @@ function startAudioOnce() {
   if (listener.context.state === 'suspended') {
     listener.context.resume();
   }
-  if (engineBufferReady) {
-    engineSound.play();
-  }
+  if (engineBufferReady) engineSound.play();
   bgMusic.play();
 }
 
-// Глобальные обработчики — запуск звука при первом касании/клике где угодно
 window.addEventListener('touchstart', startAudioOnce, { once: true, passive: true });
 window.addEventListener('click', startAudioOnce, { once: true });
 window.addEventListener('keydown', startAudioOnce, { once: true });
 
 // ===================
-// 13. Ввод
+// 13. Клавиатура
 // ===================
 const keys = { w: false, a: false, s: false, d: false };
 const codeMap = {
@@ -1025,56 +1021,115 @@ window.addEventListener('keyup', (e) => {
   if (k) { keys[k] = false; e.preventDefault(); }
 });
 
-// --- Джойстик ---
+// ===================
+// 13b. КАСТОМНЫЙ ТАЧ-ДЖОЙСТИК
+// ===================
 let joystickForward = 0;
 let joystickTurn = 0;
-const joystickZone = document.getElementById('joystick-zone');
 
 const isTouchDevice =
   ('ontouchstart' in window) ||
   (navigator.maxTouchPoints > 0) ||
   (navigator.msMaxTouchPoints > 0);
 
-if (joystickZone && isTouchDevice) {
-  joystickZone.style.display = 'block';
-  joystickZone.style.touchAction = 'none';
+if (isTouchDevice) {
+  // Создаём визуальные элементы
+  const stickBase = document.createElement('div');
+  stickBase.style.cssText = `
+    position: fixed;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    display: none;
+    pointer-events: none;
+    z-index: 60;
+    transform: translate(-50%, -50%);
+    backdrop-filter: blur(2px);
+  `;
+  document.body.appendChild(stickBase);
 
-  const jm = nipplejs.create({
-    zone: joystickZone,
-    mode: 'dynamic',
-    color: 'rgba(0, 0, 0, 0.5)',
-    size: 80,
-    threshold: 0.08,
-    fadeTime: 100,
-    restOpacity: 0.4,
-  });
+  const stickThumb = document.createElement('div');
+  stickThumb.style.cssText = `
+    position: fixed;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    display: none;
+    pointer-events: none;
+    z-index: 61;
+    transform: translate(-50%, -50%);
+  `;
+  document.body.appendChild(stickThumb);
 
-  jm.on('start', () => {
+  const MAX_DIST = 50;
+  let touchId = null;
+  let startX = 0;
+  let startY = 0;
+
+  function onTouchStart(e) {
+    if (touchId !== null) return;
+    const touch = e.changedTouches[0];
+    touchId = touch.identifier;
+    startX = touch.clientX;
+    startY = touch.clientY;
+
+    stickBase.style.left = startX + 'px';
+    stickBase.style.top = startY + 'px';
+    stickThumb.style.left = startX + 'px';
+    stickThumb.style.top = startY + 'px';
+    stickBase.style.display = 'block';
+    stickThumb.style.display = 'block';
+
     hideHint();
     startAudioOnce();
-  });
+  }
 
-  jm.on('move', (evt, data) => {
-    if (!data || !data.angle) return;
-    // angle.radian: 0 = вправо, π/2 = вверх, π = влево, -π/2 = вниз
-    const rad = data.angle.radian;
-    // Нормализуем силу: distance от 0 до ~size/2
-    const maxDist = 40;
-    const force = Math.min((data.distance || 0) / maxDist, 1);
+  function onTouchMove(e) {
+    if (touchId === null) return;
+    for (const touch of e.changedTouches) {
+      if (touch.identifier !== touchId) continue;
 
-    // Вперёд = sin(angle), вправо = cos(angle)
-    joystickForward = Math.sin(rad) * force;
-    joystickTurn = Math.cos(rad) * force;
-  });
+      let dx = touch.clientX - startX;
+      let dy = touch.clientY - startY;
+      const dist = Math.hypot(dx, dy);
 
-  jm.on('end', () => {
-    joystickForward = 0;
-    joystickTurn = 0;
-  });
+      if (dist > MAX_DIST) {
+        dx = (dx / dist) * MAX_DIST;
+        dy = (dy / dist) * MAX_DIST;
+      }
 
-  console.log('🕹️ Джойстик активирован');
-} else if (joystickZone) {
-  joystickZone.style.display = 'none';
+      stickThumb.style.left = (startX + dx) + 'px';
+      stickThumb.style.top = (startY + dy) + 'px';
+
+      // dx/MAX_DIST: -1..1 (вправо положительно)
+      // dy/MAX_DIST: -1..1 (вниз положительно)
+      joystickTurn = dx / MAX_DIST;
+      joystickForward = -dy / MAX_DIST;  // вверх = вперёд
+    }
+  }
+
+  function onTouchEnd(e) {
+    if (touchId === null) return;
+    for (const touch of e.changedTouches) {
+      if (touch.identifier !== touchId) continue;
+      touchId = null;
+      joystickForward = 0;
+      joystickTurn = 0;
+      stickBase.style.display = 'none';
+      stickThumb.style.display = 'none';
+    }
+  }
+
+  document.addEventListener('touchstart', onTouchStart, { passive: true });
+  document.addEventListener('touchmove', onTouchMove, { passive: true });
+  document.addEventListener('touchend', onTouchEnd, { passive: true });
+  document.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+  console.log('🕹️ Тач-джойстик активирован');
 }
 
 const hint = document.getElementById('hint');
@@ -1284,7 +1339,6 @@ function animate() {
 
   wheels.forEach((w) => { w.rotation.y -= speed * dt * 3; });
 
-  // Дым
   const accel = (speed - prevSpeed) / Math.max(dt, 1e-4);
   prevSpeed = speed;
 
