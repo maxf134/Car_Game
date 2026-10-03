@@ -1022,7 +1022,7 @@ window.addEventListener('keyup', (e) => {
 });
 
 // ===================
-// 13b. КАСТОМНЫЙ ТАЧ-ДЖОЙСТИК
+// 13b. КАСТОМНЫЙ ТАЧ-ДЖОЙСТИК (Pointer Events)
 // ===================
 let joystickForward = 0;
 let joystickTurn = 0;
@@ -1033,7 +1033,7 @@ const isTouchDevice =
   (navigator.msMaxTouchPoints > 0);
 
 if (isTouchDevice) {
-  // Создаём визуальные элементы
+  // Визуальные элементы
   const stickBase = document.createElement('div');
   stickBase.style.cssText = `
     position: fixed;
@@ -1066,16 +1066,24 @@ if (isTouchDevice) {
   document.body.appendChild(stickThumb);
 
   const MAX_DIST = 50;
-  let touchId = null;
+  let activePointerId = null;
   let startX = 0;
   let startY = 0;
 
-  function onTouchStart(e) {
-    if (touchId !== null) return;
-    const touch = e.changedTouches[0];
-    touchId = touch.identifier;
-    startX = touch.clientX;
-    startY = touch.clientY;
+  // Отладка
+  let debugFrame = 0;
+  function debugMove() {
+    debugFrame++;
+    if (debugFrame % 30 === 0) {
+      console.log(`🕹️ forward=${joystickForward.toFixed(2)} turn=${joystickTurn.toFixed(2)}`);
+    }
+  }
+
+  function onPointerDown(e) {
+    if (activePointerId !== null) return;
+    activePointerId = e.pointerId;
+    startX = e.clientX;
+    startY = e.clientY;
 
     stickBase.style.left = startX + 'px';
     stickBase.style.top = startY + 'px';
@@ -1086,50 +1094,45 @@ if (isTouchDevice) {
 
     hideHint();
     startAudioOnce();
+    console.log('🕹️ Тач начат в', startX, startY);
   }
 
-  function onTouchMove(e) {
-    if (touchId === null) return;
-    for (const touch of e.changedTouches) {
-      if (touch.identifier !== touchId) continue;
+  function onPointerMove(e) {
+    if (e.pointerId !== activePointerId) return;
 
-      let dx = touch.clientX - startX;
-      let dy = touch.clientY - startY;
-      const dist = Math.hypot(dx, dy);
+    let dx = e.clientX - startX;
+    let dy = e.clientY - startY;
+    const dist = Math.hypot(dx, dy);
 
-      if (dist > MAX_DIST) {
-        dx = (dx / dist) * MAX_DIST;
-        dy = (dy / dist) * MAX_DIST;
-      }
-
-      stickThumb.style.left = (startX + dx) + 'px';
-      stickThumb.style.top = (startY + dy) + 'px';
-
-      // dx/MAX_DIST: -1..1 (вправо положительно)
-      // dy/MAX_DIST: -1..1 (вниз положительно)
-      joystickTurn = dx / MAX_DIST;
-      joystickForward = -dy / MAX_DIST;  // вверх = вперёд
+    if (dist > MAX_DIST) {
+      dx = (dx / dist) * MAX_DIST;
+      dy = (dy / dist) * MAX_DIST;
     }
+
+    stickThumb.style.left = (startX + dx) + 'px';
+    stickThumb.style.top = (startY + dy) + 'px';
+
+    joystickTurn = dx / MAX_DIST;
+    joystickForward = -dy / MAX_DIST;
+
+    debugMove();
   }
 
-  function onTouchEnd(e) {
-    if (touchId === null) return;
-    for (const touch of e.changedTouches) {
-      if (touch.identifier !== touchId) continue;
-      touchId = null;
-      joystickForward = 0;
-      joystickTurn = 0;
-      stickBase.style.display = 'none';
-      stickThumb.style.display = 'none';
-    }
+  function onPointerUp(e) {
+    if (e.pointerId !== activePointerId) return;
+    activePointerId = null;
+    joystickForward = 0;
+    joystickTurn = 0;
+    stickBase.style.display = 'none';
+    stickThumb.style.display = 'none';
   }
 
-  document.addEventListener('touchstart', onTouchStart, { passive: true });
-  document.addEventListener('touchmove', onTouchMove, { passive: true });
-  document.addEventListener('touchend', onTouchEnd, { passive: true });
-  document.addEventListener('touchcancel', onTouchEnd, { passive: true });
+  window.addEventListener('pointerdown', onPointerDown, { passive: true });
+  window.addEventListener('pointermove', onPointerMove, { passive: true });
+  window.addEventListener('pointerup', onPointerUp, { passive: true });
+  window.addEventListener('pointercancel', onPointerUp, { passive: true });
 
-  console.log('🕹️ Тач-джойстик активирован');
+  console.log('🕹️ Тач-джойстик активирован (Pointer Events)');
 }
 
 const hint = document.getElementById('hint');
