@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Howl } from 'howler';
+import nipplejs from 'nipplejs';
 import './style.css';
 
 // ---------------------------
@@ -275,67 +276,66 @@ car.rotation.y = Math.atan2(startTan.x, startTan.z);
 scene.add(car);
 
 // ==========================================================
-// 11. ЗВУК — 3D через PositionalAudio + музыка через Howler
+// 11. ЗВУК
 // ==========================================================
-
-// Слушатель — «уши» камеры. От него считается расстояние до источников.
 const listener = new THREE.AudioListener();
 camera.add(listener);
 
 const audioLoader = new THREE.AudioLoader();
+const SOUND_BASE = import.meta.env.BASE_URL + 'sounds/';
 
-// --- Звук двигателя. Привязан к машине, едет вместе с ней. ---
+// --- Двигатель: 3D-звук, привязан к машине ---
 const engineSound = new THREE.PositionalAudio(listener);
-engineSound.setRefDistance(4);       // расстояние, где звук «нормальной» громкости
-engineSound.setRolloffFactor(1.6);   // как быстро глохнет с расстоянием
+engineSound.setRefDistance(4);
+engineSound.setRolloffFactor(1.2);
 engineSound.setLoop(true);
 engineSound.setVolume(0.6);
-audioLoader.load(import.meta.env.BASE_URL + 'sounds/engine.mp3',
-  (buffer) => engineSound.setBuffer(buffer));
+audioLoader.load(
+  SOUND_BASE + 'engine.mp3',
+  (buffer) => engineSound.setBuffer(buffer),
+  undefined,
+  (err) => console.error('Ошибка загрузки engine.mp3:', err)
+);
 car.add(engineSound);
 
-// --- Звук удара. Пул из 6 объектов, чтобы можно было играть несколько подряд. ---
+// --- Удары: пул из 6 объектов ---
 const HIT_POOL_SIZE = 6;
 const hitPool = [];
 for (let i = 0; i < HIT_POOL_SIZE; i++) {
   const hit = new THREE.PositionalAudio(listener);
   hit.setRefDistance(6);
-  hit.setRolloffFactor(1.2);
-  hit.setVolume(0.9);import.meta.env.BASE_URL + 'sounds/hit.mp3',
+  hit.setRolloffFactor(1.0);
   hit.setVolume(0.9);
-  audioLoader.load(import.meta.env.BASE_URL + 'sounds/hit.mp3',
-  (buffer) => hit.setBuffer(buffer));
+  audioLoader.load(
+    SOUND_BASE + 'hit.mp3',
+    (buffer) => hit.setBuffer(buffer),
+    undefined,
+    (err) => console.error('Ошибка загрузки hit.mp3:', err)
+  );
   scene.add(hit);
   hitPool.push(hit);
 }
 let hitIndex = 0;
-
 function playHitAt(x, y, z) {
   const hit = hitPool[hitIndex];
+  if (!hit || !hit.buffer) return;
   hit.position.set(x, y, z);
   if (hit.isPlaying) hit.stop();
-  if (hit.buffer) hit.play();
+  hit.play();
   hitIndex = (hitIndex + 1) % hitPool.length;
 }
 
-// --- Фоновая музыка через Howler (не 3D, играет «в голове») ---
+// --- Фоновая музыка ---
 const bgMusic = new Howl({
-   src: [import.meta.env.BASE_URL + 'sounds/background.mp3'],
+  src: [SOUND_BASE + 'background.mp3'],
   loop: true,
   volume: 0.1,
   preload: true,
   format: ['mp3'],
-  onload: () => console.log('Музыка загружена'),
   onloaderror: (id, err) => console.error('Ошибка загрузки музыки:', err),
-  onplayerror: (id, err) => {
-    console.error('Ошибка воспроизведения музыки:', err);
-    // Пробуем возобновить воспроизведение после разблокировки
-    bgMusic.once('unlock', () => bgMusic.play());
-  },
 });
 
-// Запускаем звук только после первого действия пользователя —
-// браузеры блокируют автовоспроизведение.
+// Запуск звука только после первого действия пользователя
 let audioStarted = false;
 function startAudioOnce() {
   if (audioStarted) return;
@@ -369,13 +369,14 @@ for (let i = 0; i < 18; i++) {
 }
 
 // ---------------------------
-// 13. Ввод
+// 13. Ввод с клавиатуры
 // ---------------------------
 const keys = { w: false, a: false, s: false, d: false };
 const codeMap = {
   KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd',
   ArrowUp: 'w', ArrowLeft: 'a', ArrowDown: 's', ArrowRight: 'd',
 };
+
 window.addEventListener('keydown', (e) => {
   const k = codeMap[e.code];
   if (k) {
@@ -387,11 +388,56 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => {
   const k = codeMap[e.code];
-  if (k) { keys[k] = false; e.preventDefault(); }
+  if (k) {
+    keys[k] = false;
+    e.preventDefault();
+  }
 });
 
 // ---------------------------
-// 14. Подсказка
+// 14. Мобильный джойстик (floating)
+// ---------------------------
+// ---------------------------
+// 14. Мобильный джойстик (floating)
+// ---------------------------
+let joystickForward = 0;
+let joystickTurn = 0;
+
+const joystickZone = document.getElementById('joystick-zone');
+
+if (joystickZone) {
+  const joystickManager = nipplejs.create({
+    zone: joystickZone,
+    mode: 'dynamic',
+    color: 'white',
+    size: 120,
+    threshold: 0.05,
+    fadeTime: 150,
+    restJoystick: true,
+    restOpacity: 0.6,
+  });
+
+  joystickManager.on('start', () => {
+    hideHint();
+    startAudioOnce();
+  });
+
+  joystickManager.on('move', (evt, data) => {
+    if (!data || !data.vector) return;
+    joystickForward = data.vector.y;
+    joystickTurn = data.vector.x;
+  });
+
+  joystickManager.on('end', () => {
+    joystickForward = 0;
+    joystickTurn = 0;
+  });
+} else {
+  console.warn('joystick-zone не найден в HTML — джойстик отключён');
+}
+
+// ---------------------------
+// 15. Подсказка
 // ---------------------------
 const hint = document.getElementById('hint');
 let hintHidden = false;
@@ -403,7 +449,7 @@ function hideHint() {
 }
 
 // ---------------------------
-// 15. Параметры движения
+// 16. Параметры движения
 // ---------------------------
 const MAX_SPEED = 28;
 const ACCELERATION = 14;
@@ -417,7 +463,7 @@ const CAR_RADIUS = 1.6;
 const CUBE_RADIUS = 0.7;
 
 // ---------------------------
-// 16. Геометрия коллизий с забором
+// 17. Коллизии с забором (жёсткие, только снаружи)
 // ---------------------------
 const TRACK_COLLISION_RES = 400;
 const trackPolyline = [];
@@ -426,8 +472,8 @@ for (let i = 0; i < TRACK_COLLISION_RES; i++) {
 }
 
 const FENCE_INNER = FENCE_OFFSET - FENCE_THICKNESS / 2;
-const CAR_HALF_DIAGONAL = Math.hypot(1.5, 0.8);
-const CUBE_HALF_DIAGONAL = Math.hypot(0.5, 0.5);
+const CAR_HALF_DIAGONAL = Math.hypot(1.5, 0.8);   // ≈ 1.70
+const CUBE_HALF_DIAGONAL = Math.hypot(0.5, 0.5);  // ≈ 0.71
 
 const MAX_DIST_CAR  = FENCE_INNER - CAR_HALF_DIAGONAL - 0.02;
 const MAX_DIST_CUBE = FENCE_INNER - CUBE_HALF_DIAGONAL - 0.02;
@@ -519,13 +565,13 @@ function constrainCubeToFence(cube) {
 }
 
 // ---------------------------
-// 17. Raycast для прозрачности
+// 18. Raycast для прозрачности
 // ---------------------------
 const raycaster = new THREE.Raycaster();
 const camToCar = new THREE.Vector3();
 
 // ---------------------------
-// 18. Анимация
+// 19. Анимация
 // ---------------------------
 const clock = new THREE.Clock();
 const forward = new THREE.Vector3();
@@ -534,30 +580,44 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  // Разгон / торможение
-  if (keys.w) speed += ACCELERATION * dt;
-  else if (keys.s) speed -= BRAKE * dt;
-  else {
+  // --- Ввод: клавиатура + джойстик ---
+  const kbThrottle = (keys.w ? 1 : 0) - (keys.s ? 1 : 0);
+  const jsThrottle = joystickForward > 0.1 ? joystickForward
+                    : joystickForward < -0.1 ? joystickForward : 0;
+
+  if (kbThrottle !== 0) {
+    if (kbThrottle > 0) speed += ACCELERATION * dt;
+    else speed -= BRAKE * dt;
+  } else if (jsThrottle !== 0) {
+    if (jsThrottle > 0) speed += ACCELERATION * jsThrottle * dt;
+    else speed -= BRAKE * Math.abs(jsThrottle) * dt;
+  } else {
     if (speed > 0) speed = Math.max(0, speed - FRICTION * dt);
     else if (speed < 0) speed = Math.min(0, speed + FRICTION * dt);
   }
   speed = THREE.MathUtils.clamp(speed, -MAX_SPEED, MAX_SPEED);
 
-  // Поворот
+  // --- Поворот: клавиатура + джойстик ---
   const turnFactor = Math.min(Math.abs(speed) / 3, 1);
-  if (keys.a) car.rotation.y += TURN_SPEED * dt * turnFactor;
-  if (keys.d) car.rotation.y -= TURN_SPEED * dt * turnFactor;
+  let turnInput = 0;
+  if (keys.a) turnInput += 1;
+  if (keys.d) turnInput -= 1;
+  if (Math.abs(joystickTurn) > 0.1) turnInput -= joystickTurn;
 
-  // Движение
+  car.rotation.y += TURN_SPEED * dt * turnFactor * turnInput;
+
+  // --- Движение вперёд ---
   forward.set(1, 0, 0).applyQuaternion(car.quaternion);
   car.position.addScaledVector(forward, speed * dt);
 
   constrainCarToFence(car.position);
 
-  // Колёса
-  wheels.forEach((w) => { w.rotation.y -= speed * dt * 3; });
+  // --- Колёса ---
+  wheels.forEach((w) => {
+    w.rotation.y -= speed * dt * 3;
+  });
 
-  // Кубики
+  // --- Кубики ---
   for (const c of cubes) {
     const dx = c.position.x - car.position.x;
     const dz = c.position.z - car.position.z;
@@ -575,7 +635,6 @@ function animate() {
       c.userData.velZ = nz * kick * 1.5;
       speed *= 0.9;
 
-      // ЗВУК УДАРА — 3D, играем из точки столкновения
       playHitAt(c.position.x, 0.5, c.position.z);
     }
 
@@ -593,20 +652,20 @@ function animate() {
     constrainCubeToFence(c);
   }
 
-  // Камера
+  // --- Камера ---
   const cameraOffset = new THREE.Vector3(16, 16, 16);
   const desiredPos = cameraOffset.clone().add(car.position);
   camera.position.lerp(desiredPos, 1 - Math.pow(0.001, dt));
   camera.lookAt(car.position);
 
-  // Звук двигателя — меняем тон в зависимости от скорости
+  // --- Двигатель: тон и громкость по скорости ---
   if (engineSound.isPlaying) {
     const speedRatio = Math.abs(speed) / MAX_SPEED;
     engineSound.setPlaybackRate(0.8 + speedRatio * 0.7);
-    engineSound.setVolume(0.45 + speedRatio * 0.7);
+    engineSound.setVolume(0.4 + speedRatio * 0.5);
   }
 
-  // Автопрозрачность
+  // --- Автопрозрачность домов и забора ---
   camToCar.subVectors(car.position, camera.position);
   const camDist = camToCar.length();
   camToCar.normalize();
@@ -622,7 +681,7 @@ function animate() {
 animate();
 
 // ---------------------------
-// 19. Resize
+// 20. Resize
 // ---------------------------
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;

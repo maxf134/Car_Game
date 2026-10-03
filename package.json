@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "howler": "^2.2.4",
+    "nipplejs": "^1.0.4",
     "three": "^0.186.1"
   }
 }

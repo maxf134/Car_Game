@@ -10,6 +10,9 @@ body {
   height: 100%;
   overflow: hidden;
   background: #87ceeb;
+  touch-action: none; /* отключаем скролл/зум на мобильных */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 #app {
@@ -30,7 +33,7 @@ canvas {
   color: #fff;
   padding: 28px 40px;
   border-radius: 14px;
-  font-family: system-ui, sans-serif;
+  font-family: system-ui, -apple-system, sans-serif;
   text-align: center;
   z-index: 10;
   transition: opacity 0.6s ease;
@@ -53,4 +56,21 @@ canvas {
 
 #hint b {
   color: #ffee00;
+}
+
+/* Зона джойстика — только для тач-устройств */
+#joystick-zone {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 50;
+  display: none;
+}
+
+@media (pointer: coarse) {
+  #joystick-zone {
+    display: block;
+  }
 }
