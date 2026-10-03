@@ -302,6 +302,8 @@ for (let i = 0; i < HIT_POOL_SIZE; i++) {
   hit.setRefDistance(6);
   hit.setRolloffFactor(1.2);
   hit.setVolume(0.9);import.meta.env.BASE_URL + 'sounds/hit.mp3',
+  hit.setVolume(0.9);
+  audioLoader.load(import.meta.env.BASE_URL + 'sounds/hit.mp3',
   (buffer) => hit.setBuffer(buffer));
   scene.add(hit);
   hitPool.push(hit);
@@ -318,10 +320,18 @@ function playHitAt(x, y, z) {
 
 // --- Фоновая музыка через Howler (не 3D, играет «в голове») ---
 const bgMusic = new Howl({
-  src: [import.meta.env.BASE_URL + 'sounds/background.mp3'],src: ['/sounds/background.mp3'],
+   src: [import.meta.env.BASE_URL + 'sounds/background.mp3'],
   loop: true,
-  volume: 0.05,
-  html5: true, // чтобы не грузить весь файл в память сразу
+  volume: 0.1,
+  preload: true,
+  format: ['mp3'],
+  onload: () => console.log('Музыка загружена'),
+  onloaderror: (id, err) => console.error('Ошибка загрузки музыки:', err),
+  onplayerror: (id, err) => {
+    console.error('Ошибка воспроизведения музыки:', err);
+    // Пробуем возобновить воспроизведение после разблокировки
+    bgMusic.once('unlock', () => bgMusic.play());
+  },
 });
 
 // Запускаем звук только после первого действия пользователя —
